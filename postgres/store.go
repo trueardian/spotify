@@ -31,7 +31,7 @@ func New(pool *pgxpool.Pool, dsn string) *Store {
 func (s *Store) GetRefreshToken(ctx context.Context, userID string) (string, error) {
 	var token string
 	err := s.pool.QueryRow(ctx,
-		`SELECT refresh_token FROM spotify_tokens WHERE owner_id = $1`, userID,
+		`SELECT refresh_token FROM spotify_tokens WHERE owner = $1`, userID,
 	).Scan(&token)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -45,9 +45,9 @@ func (s *Store) GetRefreshToken(ctx context.Context, userID string) (string, err
 // SaveRefreshToken inserts or replaces the refresh token for userID.
 func (s *Store) SaveRefreshToken(ctx context.Context, userID, refreshToken string) error {
 	_, err := s.pool.Exec(ctx,
-		`INSERT INTO spotify_tokens (owner_id, refresh_token)
+		`INSERT INTO spotify_tokens (owner, refresh_token)
 		 VALUES ($1, $2)
-		 ON CONFLICT (owner_id) DO UPDATE SET refresh_token = EXCLUDED.refresh_token`,
+		 ON CONFLICT (owner) DO UPDATE SET refresh_token = EXCLUDED.refresh_token`,
 		userID, refreshToken,
 	)
 	if err != nil {
