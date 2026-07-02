@@ -22,6 +22,11 @@ player.go       Devices, CurrentPlayback, Play, Pause, Resume, Next, Previous, S
 postgres/
   store.go      implementasi TokenStore di atas pgxpool, Migrate()
   migrations/   SQL files, di-embed via //go:embed
+firestore/
+  store.go      implementasi TokenStore di atas Cloud Firestore: New(client, opts) — satu
+                dokumen per user (doc ID = userID, koleksi spotify_tokens, override via
+                WithCollection), created_at dipertahankan saat replace (transactional).
+                Tanpa migrasi — Firestore schemaless.
 ```
 
 ## Cara Pakai

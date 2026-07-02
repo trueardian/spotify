@@ -15,8 +15,8 @@ go get go.naturallyfunny.dev/spotify
 
 `Client` takes two injected dependencies:
 
-- **`TokenStore`** — per-user refresh-token storage. An interface (consumer-defined); a
-  ready-made implementation lives in the `postgres` package.
+- **`TokenStore`** — per-user refresh-token storage. An interface (consumer-defined);
+  ready-made implementations live in the `postgres` and `firestore` packages.
 - **`*spotifyauth.Authenticator`** — OAuth credentials (client ID/secret, redirect URI,
   scopes). The library does not build credentials itself.
 
@@ -36,6 +36,19 @@ if err := store.Migrate(); err != nil {
 }
 
 client := spotify.New(store, auth)
+```
+
+Or back tokens with Cloud Firestore instead (alias one of the two firestore imports;
+there is nothing to migrate):
+
+```go
+import (
+    gcfs "cloud.google.com/go/firestore"
+    "go.naturallyfunny.dev/spotify/firestore"
+)
+
+fs, err := gcfs.NewClient(ctx, projectID)
+store := firestore.New(fs) // one document per user in "spotify_tokens" (WithCollection overrides)
 ```
 
 ## Connecting a user (OAuth)
@@ -175,4 +188,7 @@ Match with `errors.Is` / `errors.As` to decide what to do:
 
 The reference store (`postgres`) uses `golang-migrate`; SQL is embedded via `//go:embed`.
 `store.Migrate()` runs pending migrations. Schema: a single `spotify_tokens` table
-(`owner_id text`, `refresh_token`).
+(`owner text`, `refresh_token`).
+
+The `firestore` store has no migrations — Firestore is schemaless, and the
+`spotify_tokens` collection appears with the first saved token.
