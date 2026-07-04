@@ -70,31 +70,80 @@ func (c *Client) CurrentPlayback(ctx context.Context, userID string) (*Playback,
 	return pb, nil
 }
 
-// Play starts or resumes playback on the user's device. uri selects what to
-// play and is routed by its Spotify URI type: a track URI plays that single
-// track, while an album, playlist, or artist URI plays that context. An empty
-// uri resumes whatever is already loaded. An empty deviceID targets the user's
-// currently active device.
-func (c *Client) Play(ctx context.Context, userID, deviceID, uri string) error {
+// PlayRequest describes what to play and where. The zero value resumes whatever
+// is already loaded on the active device.
+type PlayRequest struct {
+	// DeviceID targets a specific device. Empty uses the user's currently active
+	// device. A device only has to be available (open somewhere, appearing in
+	// Devices) — it need not already be active — for playback to land on it.
+	DeviceID string
+
+	// ContextURI is an album, playlist, or artist to play within. When set,
+	// playback runs inside that context so skip next/previous stay bounded to
+	// it. Empty plays no context.
+	ContextURI string
+
+	// URI is a single Spotify entity to play. Its meaning depends on ContextURI:
+	//   - With ContextURI set, URI is the track to start at inside the context;
+	//     playback begins there and skip next/previous stay in the context.
+	//   - Without ContextURI, a track URI plays that track detached, while an
+	//     album, playlist, or artist URI plays that whole context (from its
+	//     start).
+	// Empty starts ContextURI from its beginning, or — with no ContextURI
+	// either — resumes whatever is already loaded.
+	URI string
+}
+
+// Play starts or resumes playback on the user's device according to req. See
+// PlayRequest for how DeviceID, ContextURI, and URI combine.
+func (c *Client) Play(ctx context.Context, userID string, req PlayRequest) error {
 	sc, err := c.clientFor(ctx, userID)
 	if err != nil {
 		return err
 	}
 	opts := &spotify.PlayOptions{}
-	if deviceID != "" {
-		id := spotify.ID(deviceID)
+	if req.DeviceID != "" {
+		id := spotify.ID(req.DeviceID)
 		opts.DeviceID = &id
 	}
-	if uri != "" {
-		if isContextURI(uri) {
-			ctxURI := spotify.URI(uri)
+	switch {
+	case req.ContextURI != "":
+		ctxURI := spotify.URI(req.ContextURI)
+		opts.PlaybackContext = &ctxURI
+		// An offset points playback at a specific track inside the context while
+		// keeping skip next/previous bounded to it.
+		if req.URI != "" {
+			opts.PlaybackOffset = &spotify.PlaybackOffset{URI: spotify.URI(req.URI)}
+		}
+	case req.URI != "":
+		// No explicit context: route a bare context URI (album/playlist/artist)
+		// as the context to play whole, and anything else as a single track.
+		if isContextURI(req.URI) {
+			ctxURI := spotify.URI(req.URI)
 			opts.PlaybackContext = &ctxURI
 		} else {
-			opts.URIs = []spotify.URI{spotify.URI(uri)}
+			opts.URIs = []spotify.URI{spotify.URI(req.URI)}
 		}
 	}
 	if err := sc.PlayOpt(ctx, opts); err != nil {
 		return wrapError("play", err)
+	}
+	return nil
+}
+
+// TransferPlayback moves the active playback session to deviceID, carrying the
+// current queue and position across. When play is true it also ensures playback
+// is running on the target; when false it preserves the current play/pause
+// state. Unlike Play, it continues the existing session rather than starting new
+// content, which makes it the clean way to wake an available-but-inactive device
+// and keep listening on it. deviceID must name an available device (see Devices).
+func (c *Client) TransferPlayback(ctx context.Context, userID, deviceID string, play bool) error {
+	sc, err := c.clientFor(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if err := sc.TransferPlayback(ctx, spotify.ID(deviceID), play); err != nil {
+		return wrapError("transfer playback", err)
 	}
 	return nil
 }

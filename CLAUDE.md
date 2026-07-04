@@ -41,7 +41,7 @@ store := postgres.New(pool, dsn)
 client := spotify.New(store, auth)
 
 tracks, err := client.SearchTracks(ctx, userID, "Queen")
-err = client.Play(ctx, userID, deviceID, trackURI)
+err = client.Play(ctx, userID, spotify.PlayRequest{DeviceID: deviceID, URI: trackURI})
 ```
 
 ## Migrations

@@ -165,7 +165,20 @@ all — a deliberate choice for the single-AI-agent use case that uses every cap
 
 ```go
 tracks, err := client.SearchTracks(ctx, userID, "Queen")
-err = client.Play(ctx, userID, deviceID, tracks[0].URI) // track URI, or album/playlist/artist URI
+
+// Play a single track, or a whole album/playlist/artist, on a device.
+err = client.Play(ctx, userID, spotify.PlayRequest{DeviceID: deviceID, URI: tracks[0].URI})
+
+// Play a track *within* a playlist context so skip next/previous stay in it.
+err = client.Play(ctx, userID, spotify.PlayRequest{
+    DeviceID:   deviceID,
+    ContextURI: "spotify:playlist:...",
+    URI:        tracks[0].URI, // the track to start at inside the playlist
+})
+
+// Wake an available-but-idle device by moving the current session onto it.
+err = client.TransferPlayback(ctx, userID, deviceID, true)
+
 err = client.Pause(ctx, userID)
 err = client.Next(ctx, userID)
 
