@@ -76,6 +76,10 @@ must land on an HTTP address you own.
 
 From this point `GetRefreshToken` is populated → every command (Play, Pause, etc.) works.
 
+To undo the flow, `Disconnect(ctx, userID)` deletes the stored refresh token
+(`ErrNotConnected` when there was none). Only this side forgets the token — the grant
+stays listed on the user's Spotify account (spotify.com/account/apps) until revoked there.
+
 ### Redirect URI: set once, or override per call
 
 Spotify requires the redirect URI to be **registered first** in the Developer Dashboard, and

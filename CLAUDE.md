@@ -14,8 +14,8 @@ service high-throughput** — beberapa "kelemahan" adalah keputusan sadar, bukan
 ## Struktur
 
 ```
-client.go       Client, TokenStore interface, tipe Track/Playlist/Device/Playback, OAuth (AuthURL/Exchange),
-                error mapping lintas-fitur (ErrRateLimited, wrapError, sentinelFor)
+client.go       Client, TokenStore interface, tipe Track/Playlist/Device/Playback, OAuth (AuthURL/Exchange/
+                Connect/Disconnect), error mapping lintas-fitur (ErrRateLimited, wrapError, sentinelFor)
 search.go       SearchTracks, SearchPlaylists, UserPlaylists, PlaylistTracks (tanpa Market: from_token butuh
                 scope user-read-private di luar RequiredScopes)
 player.go       Devices, CurrentPlayback, Play, Pause, Resume, Next, Previous, Seek, SetVolume,

@@ -47,14 +47,17 @@ func TestAuthURLRedirectURI(t *testing.T) {
 	})
 }
 
-// mockTokenStore records SaveRefreshToken calls so Connect tests can assert what
-// was persisted, and lets a test force a save failure via saveErr.
+// mockTokenStore records SaveRefreshToken and DeleteRefreshToken calls so
+// Connect/Disconnect tests can assert what happened, and lets a test force a
+// failure via saveErr/deleteErr.
 type mockTokenStore struct {
-	saveErr error
+	saveErr   error
+	deleteErr error
 
-	saveCalled bool
-	savedUser  string
-	savedToken string
+	saveCalled  bool
+	savedUser   string
+	savedToken  string
+	deletedUser string
 }
 
 func (m *mockTokenStore) GetRefreshToken(ctx context.Context, userID string) (string, error) {
@@ -66,6 +69,11 @@ func (m *mockTokenStore) SaveRefreshToken(ctx context.Context, userID, refreshTo
 	m.savedUser = userID
 	m.savedToken = refreshToken
 	return m.saveErr
+}
+
+func (m *mockTokenStore) DeleteRefreshToken(ctx context.Context, userID string) error {
+	m.deletedUser = userID
+	return m.deleteErr
 }
 
 // roundTripFunc adapts a function into an http.RoundTripper.
@@ -140,6 +148,27 @@ func TestConnect_SaveError(t *testing.T) {
 	}
 	if !store.saveCalled {
 		t.Error("SaveRefreshToken was not called")
+	}
+}
+
+func TestDisconnect_DeletesToken(t *testing.T) {
+	store := &mockTokenStore{}
+	c := New(store, newAuthForExchange())
+
+	if err := c.Disconnect(context.Background(), "user-1"); err != nil {
+		t.Fatalf("Disconnect() error = %v, want nil", err)
+	}
+	if store.deletedUser != "user-1" {
+		t.Errorf("deleted userID = %q, want %q", store.deletedUser, "user-1")
+	}
+}
+
+func TestDisconnect_NotConnected(t *testing.T) {
+	store := &mockTokenStore{deleteErr: ErrNotConnected}
+	c := New(store, newAuthForExchange())
+
+	if err := c.Disconnect(context.Background(), "user-1"); !errors.Is(err, ErrNotConnected) {
+		t.Fatalf("Disconnect() error = %v, want ErrNotConnected", err)
 	}
 }
 

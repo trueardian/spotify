@@ -56,6 +56,21 @@ func (s *Store) SaveRefreshToken(ctx context.Context, userID, refreshToken strin
 	return nil
 }
 
+// DeleteRefreshToken removes the user's refresh token, returning
+// ErrNotConnected when there was none to remove — matching GetRefreshToken.
+func (s *Store) DeleteRefreshToken(ctx context.Context, userID string) error {
+	tag, err := s.pool.Exec(ctx,
+		`DELETE FROM spotify_tokens WHERE owner = $1`, userID,
+	)
+	if err != nil {
+		return fmt.Errorf("delete refresh token: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return spotify.ErrNotConnected
+	}
+	return nil
+}
+
 // Migrate runs all pending database migrations.
 func (s *Store) Migrate() error {
 	src, err := iofs.New(migrations, "migrations")

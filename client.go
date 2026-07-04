@@ -64,12 +64,15 @@ func (e *ScopeError) Unwrap() error { return ErrMissingScopes }
 
 // TokenStore persists Spotify OAuth tokens on behalf of a user.
 // Implement this interface to provide your own storage backend.
-// GetRefreshToken must return ErrNotConnected when no token exists for userID.
+// GetRefreshToken and DeleteRefreshToken must return ErrNotConnected when no
+// token exists for userID.
 type TokenStore interface {
 	GetRefreshToken(ctx context.Context, userID string) (string, error)
 	// SaveRefreshToken stores (or replaces) the refresh token for userID.
 	// It is called after a successful OAuth exchange.
 	SaveRefreshToken(ctx context.Context, userID, refreshToken string) error
+	// DeleteRefreshToken removes the stored refresh token for userID.
+	DeleteRefreshToken(ctx context.Context, userID string) error
 }
 
 // Client provides access to Spotify on behalf of a user.
@@ -196,6 +199,17 @@ func (c *Client) Connect(ctx context.Context, userID, code string, opts ...AuthO
 		return err
 	}
 	return c.tokenStore.SaveRefreshToken(ctx, userID, refreshToken)
+}
+
+// Disconnect undoes Connect: it removes the user's stored refresh token, so
+// every capability returns ErrNotConnected until the user completes a new
+// OAuth flow. Returns ErrNotConnected when the user was not connected.
+//
+// Only this side forgets the token — the grant itself stays listed on the
+// user's Spotify account (spotify.com/account/apps) until they revoke it
+// there.
+func (c *Client) Disconnect(ctx context.Context, userID string) error {
+	return c.tokenStore.DeleteRefreshToken(ctx, userID)
 }
 
 // grantedScopes reads the scopes Spotify actually granted from the token
