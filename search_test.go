@@ -1,6 +1,7 @@
 package spotify
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
 
@@ -41,24 +42,62 @@ func TestTrackFromNoArtists(t *testing.T) {
 	}
 }
 
-func TestPlaylistFrom(t *testing.T) {
-	simple := spotify.SimplePlaylist{
-		ID:           "37i9dQZF1DXcBWIGoYBM5M",
-		Name:         "Today's Top Hits",
-		Description:  "The hottest tracks.",
-		Tracks:       spotify.PlaylistTracks{Total: 50},
-		ExternalURLs: map[string]string{"spotify": "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M"},
+// TestPlaylistObjectToPlaylist decodes a playlist object in Spotify's post-2026
+// shape — the track summary under "items", not "tracks" — and checks the count
+// survives the rename. A regression here is exactly what made my_playlists
+// report every playlist as empty.
+func TestPlaylistObjectToPlaylist(t *testing.T) {
+	const body = `{
+		"id": "41iitOCfonTIfkRTqqI6Uq",
+		"name": "🌌",
+		"description": "night drive",
+		"external_urls": {"spotify": "https://open.spotify.com/playlist/41iitOCfonTIfkRTqqI6Uq"},
+		"items": {"href": "https://api.spotify.com/v1/playlists/41iitOCfonTIfkRTqqI6Uq/items", "total": 11}
+	}`
+
+	var p playlistObject
+	if err := json.Unmarshal([]byte(body), &p); err != nil {
+		t.Fatalf("unmarshal: %v", err)
 	}
 
 	want := Playlist{
-		ID:          "37i9dQZF1DXcBWIGoYBM5M",
-		Name:        "Today's Top Hits",
-		Description: "The hottest tracks.",
-		Total:       50,
-		URL:         "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M",
+		ID:          "41iitOCfonTIfkRTqqI6Uq",
+		Name:        "🌌",
+		Description: "night drive",
+		Total:       11,
+		URL:         "https://open.spotify.com/playlist/41iitOCfonTIfkRTqqI6Uq",
+	}
+	if got := p.toPlaylist(); !reflect.DeepEqual(got, want) {
+		t.Errorf("toPlaylist() = %+v, want %+v", got, want)
+	}
+}
+
+// TestTrackObjectToTrack decodes a playlist item's track, which after the
+// migration is wrapped under "item" and carries a "type" that separates tracks
+// from podcast episodes.
+func TestTrackObjectToTrack(t *testing.T) {
+	const body = `{
+		"type": "track",
+		"id": "6rqhFgbbKwnb9MLmUQDhG6",
+		"name": "Bohemian Rhapsody",
+		"uri": "spotify:track:6rqhFgbbKwnb9MLmUQDhG6",
+		"external_urls": {"spotify": "https://open.spotify.com/track/6rqhFgbbKwnb9MLmUQDhG6"},
+		"artists": [{"name": "Queen"}, {"name": "Someone Else"}]
+	}`
+
+	var tr trackObject
+	if err := json.Unmarshal([]byte(body), &tr); err != nil {
+		t.Fatalf("unmarshal: %v", err)
 	}
 
-	if got := playlistFrom(simple); !reflect.DeepEqual(got, want) {
-		t.Errorf("playlistFrom() = %+v, want %+v", got, want)
+	want := Track{
+		ID:      "6rqhFgbbKwnb9MLmUQDhG6",
+		Name:    "Bohemian Rhapsody",
+		Artists: []string{"Queen", "Someone Else"},
+		URI:     "spotify:track:6rqhFgbbKwnb9MLmUQDhG6",
+		URL:     "https://open.spotify.com/track/6rqhFgbbKwnb9MLmUQDhG6",
+	}
+	if got := tr.toTrack(); !reflect.DeepEqual(got, want) {
+		t.Errorf("toTrack() = %+v, want %+v", got, want)
 	}
 }

@@ -2,6 +2,7 @@ package spotify
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -222,13 +223,53 @@ func missingScopes(required, granted []string) []string {
 }
 
 func (c *Client) clientFor(ctx context.Context, userID string) (*spotify.Client, error) {
+	httpClient, err := c.httpClientFor(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return spotify.New(httpClient), nil
+}
+
+// httpClientFor returns the user's token-refreshing *http.Client for talking to
+// the Spotify Web API directly. Playlist reads bypass zmb3 (see getJSON) because
+// v2.4.3 predates Spotify's 2026 field migration and still speaks the retired
+// shapes; every other capability goes through the zmb3 client from clientFor.
+func (c *Client) httpClientFor(ctx context.Context, userID string) (*http.Client, error) {
 	refreshToken, err := c.tokenStore.GetRefreshToken(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("get token for user %s: %w", userID, err)
 	}
-	token := &oauth2.Token{RefreshToken: refreshToken}
-	httpClient := c.auth.Client(ctx, token)
-	return spotify.New(httpClient), nil
+	return c.auth.Client(ctx, &oauth2.Token{RefreshToken: refreshToken}), nil
+}
+
+// apiBase is the Spotify Web API root. The oauth2 http client only injects the
+// bearer token, so callers pass absolute URLs.
+const apiBase = "https://api.spotify.com/v1"
+
+// getJSON performs an authenticated GET against the Spotify Web API and decodes
+// a 200 body into out. A non-200 is decoded into a spotify.Error so that
+// wrapError/sentinelFor classify it exactly like a zmb3-originated error.
+func getJSON(ctx context.Context, hc *http.Client, url string, out any) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := hc.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		var body struct {
+			Error struct {
+				Status  int    `json:"status"`
+				Message string `json:"message"`
+			} `json:"error"`
+		}
+		_ = json.NewDecoder(resp.Body).Decode(&body)
+		return spotify.Error{Status: resp.StatusCode, Message: body.Error.Message}
+	}
+	return json.NewDecoder(resp.Body).Decode(out)
 }
 
 // ErrRateLimited means Spotify is throttling the application (HTTP 429). It can
