@@ -11,9 +11,12 @@ func (c *Client) SearchTracks(ctx context.Context, userID, query string) ([]Trac
 	if err != nil {
 		return nil, err
 	}
-	// Market scopes results to tracks playable in the user's region, so a
-	// subsequent Play does not fail on an unplayable track.
-	results, err := sc.Search(ctx, query, spotify.SearchTypeTrack, spotify.Limit(10), spotify.Market(spotify.MarketFromToken))
+	// No Market here: market=from_token needs the user-read-private scope, which
+	// is outside RequiredScopes, so requesting it 403s with "Insufficient client
+	// scope". Search therefore runs unscoped and returns globally-available
+	// results; a track surfaced here may occasionally be unplayable in the user's
+	// region, which a subsequent Play would report.
+	results, err := sc.Search(ctx, query, spotify.SearchTypeTrack, spotify.Limit(10))
 	if err != nil {
 		return nil, wrapError("search tracks", err)
 	}
@@ -29,7 +32,7 @@ func (c *Client) SearchPlaylists(ctx context.Context, userID, query string) ([]P
 	if err != nil {
 		return nil, err
 	}
-	results, err := sc.Search(ctx, query, spotify.SearchTypePlaylist, spotify.Limit(10), spotify.Market(spotify.MarketFromToken))
+	results, err := sc.Search(ctx, query, spotify.SearchTypePlaylist, spotify.Limit(10))
 	if err != nil {
 		return nil, wrapError("search playlists", err)
 	}
@@ -61,7 +64,7 @@ func (c *Client) PlaylistTracks(ctx context.Context, userID, playlistID string) 
 	if err != nil {
 		return nil, err
 	}
-	page, err := sc.GetPlaylistItems(ctx, spotify.ID(playlistID), spotify.Limit(50), spotify.Market(spotify.MarketFromToken))
+	page, err := sc.GetPlaylistItems(ctx, spotify.ID(playlistID), spotify.Limit(50))
 	if err != nil {
 		return nil, wrapError("playlist tracks", err)
 	}
