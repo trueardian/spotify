@@ -377,3 +377,48 @@ func TestWrapError(t *testing.T) {
 		}
 	})
 }
+
+// getterStore is a TokenStore whose GetRefreshToken outcome is scripted, for
+// exercising Connected without expecting saves or deletes.
+type getterStore struct {
+	token string
+	err   error
+}
+
+func (g *getterStore) GetRefreshToken(context.Context, string) (string, error) {
+	return g.token, g.err
+}
+func (g *getterStore) SaveRefreshToken(context.Context, string, string) error {
+	return errors.New("getterStore: SaveRefreshToken not expected")
+}
+func (g *getterStore) DeleteRefreshToken(context.Context, string) error {
+	return errors.New("getterStore: DeleteRefreshToken not expected")
+}
+
+// Connected maps the store's three outcomes for the UI status check: a stored
+// token is true, ErrNotConnected is false-without-error, anything else is an
+// infrastructure error.
+func TestConnected(t *testing.T) {
+	tests := []struct {
+		name    string
+		store   *getterStore
+		want    bool
+		wantErr bool
+	}{
+		{name: "connected", store: &getterStore{token: "refresh-xyz"}, want: true},
+		{name: "not connected", store: &getterStore{err: ErrNotConnected}, want: false},
+		{name: "store failure", store: &getterStore{err: errors.New("boom")}, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := New(tt.store, newAuthForExchange())
+			got, err := c.Connected(context.Background(), "user")
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("Connected err = %v, wantErr %v", err, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Errorf("Connected = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
