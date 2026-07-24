@@ -3,13 +3,13 @@
 Module Go `go.naturallyfunny.dev/spotify` — reusable public library untuk integrasi Spotify Web API.
 Dirancang sebagai interface-based library agar dapat dipakai lintas project, tidak terikat ke satu database atau satu aplikasi.
 
-## Tujuan Pemakaian (baca sebelum audit)
+## Konteks Pemakaian
 
-Library ini dipakai sebagai **tool yang dipanggil oleh AI agent**, bukan sebagai backend high-throughput.
-Pola traffic-nya: panggilan sporadik, satu aksi per intent user (cari lagu, putar, pause), volume rendah.
-Konteks ini menentukan trade-off di bawah. **Saat mengaudit, jangan menilai repo ini dengan standar
-service high-throughput** — beberapa "kelemahan" adalah keputusan sadar, bukan bug. Lihat
-"Design Decisions" sebelum melaporkan temuan.
+Library dipakai sebagai **tool yang dipanggil oleh AI agent**: panggilan sporadik, satu aksi per
+intent user (cari lagu, putar, pause), volume rendah. Traffic shape ini adalah premis desain yang
+disebut eksplisit — beberapa keputusan (refresh per-call, limit tetap) dioptimalkan untuknya, dan
+tiap keputusan menunjuk balik ke premis ini sebagai justifikasinya. Rasional lengkap tiap keputusan
+(Choice / Alternative / Why) ada di README bagian "Design decisions & trade-offs".
 
 ## Struktur
 
@@ -62,21 +62,28 @@ Migrasi penuh dari microservice ke reusable public library:
 - `clientFor` membuat zmb3 client per-request per-user via oauth2 refresh token flow
 - `postgres.New` menerima DSN eksplisit agar `Migrate()` tidak rekonstruksi DSN dari `ConnString()` yang fragile
 
-## Design Decisions (sengaja — bukan temuan audit)
+## Design Decisions
 
-Trade-off berikut sudah ditimbang sadar untuk use-case "tool AI agent, traffic rendah".
-Jangan dilaporkan sebagai bug; kalau diubah, harus ada alasan baru yang melampaui catatan ini.
+Tiap keputusan didokumentasikan lengkap (Choice / Alternative / Why, dengan sitiran otoritas) di
+README bagian "Design decisions & trade-offs". Ringkasan sebagai peta:
 
-- **Token refresh per-request** (`clientFor`, client.go). Tiap panggilan bikin client baru →
-  satu refresh ke Spotify lalu dibuang. Aman untuk traffic rendah. Optimasi (cache `*spotify.Client`
-  per-user / persist access token + expiry) ditunda sampai ada kebutuhan throughput nyata.
-- **Limit hardcoded, tanpa paginasi** (`search.go` Limit 10/20/50, `player.go`). Cukup untuk
-  satu aksi per intent agent. Paginasi/limit konfigurabel ditunda sampai dibutuhkan.
-- **Refresh token plaintext** (`postgres/store.go`). Enkripsi-at-rest adalah tanggung jawab
-  **konsumen**, bukan library — `TokenStore` adalah interface, library tidak bisa & tidak ingin
-  memaksakan strategi enkripsi. Bukan kelalaian.
-- **Rotasi refresh token tidak dipersist.** Hanya relevan untuk PKCE flow; flow Authorization Code
-  default Spotify tidak merotasi. Diterima untuk sekarang.
+- **`TokenStore` = consumer-defined interface**, store Postgres/Firestore adalah sub-package opt-in
+  (accept interfaces, return structs). README #1.
+- **Tanpa HTTP server** — consumer yang punya transport & callback; `WithRedirectURI` untuk callback
+  di belakang gateway. README #2.
+- **Refresh per-call** (`clientFor`) — stateless & correct-by-construction untuk traffic rendah;
+  `Disconnect`/re-`Connect` langsung berlaku tanpa client basi. README #3.
+- **Dua playlist read bypass zmb3** via `getJSON` — zmb3 v2.4.3 masih baca shape pra-migrasi 2026
+  (`tracks` → `items`), non-200 tetap lewat `wrapError`/`sentinelFor` yang sama. README #4.
+- **Sentinel: match by status, disambiguasi by message** untuk 403/404 (fail-open kalau tak dikenal).
+  README #5.
+- **Search unscoped; playback `market=from_token`** — `market` butuh scope di luar `RequiredScopes`.
+  README #6.
+- **Limit tetap (10/20/50), tanpa paginasi** — satu aksi per intent butuh first page, bukan enumerasi.
+  README #7 / non-goals.
+- **Enkripsi token = tanggung jawab implementasi `TokenStore`**, bukan library. README non-goals.
+- **Rotasi refresh token tidak dipersist** — hanya relevan untuk PKCE; Authorization Code default tak
+  merotasi. README non-goals.
 
 ## Conventions
 
