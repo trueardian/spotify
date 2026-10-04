@@ -1,6 +1,6 @@
 # spotify
 
-[![Go Reference](https://pkg.go.dev/badge/go.naturallyfunny.dev/spotify.svg)](https://pkg.go.dev/go.naturallyfunny.dev/spotify)
+[![Go Reference](https://pkg.go.dev/badge/go.trueardian.com/spotify.svg)](https://pkg.go.dev/go.trueardian.com/spotify)
 [![Go 1.25](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)](go.mod)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -108,7 +108,7 @@ authenticator and `Exchange` validates them (see [OAuth](#connecting-a-user-oaut
 ## Install
 
 ```sh
-go get go.naturallyfunny.dev/spotify
+go get go.trueardian.com/spotify
 ```
 
 Requires Go 1.25+. The bundled stores pull their own drivers only when you import
@@ -127,8 +127,8 @@ import (
     "errors"
     "log"
 
-    "go.naturallyfunny.dev/spotify"
-    "go.naturallyfunny.dev/spotify/postgres"
+    "go.trueardian.com/spotify"
+    "go.trueardian.com/spotify/postgres"
 
     "github.com/jackc/pgx/v5/pgxpool"
     spotifyauth "github.com/zmb3/spotify/v2/auth"
@@ -177,7 +177,7 @@ Prefer Cloud Firestore? Swap the store; there is nothing to migrate:
 ```go
 import (
     gcfs "cloud.google.com/go/firestore"
-    "go.naturallyfunny.dev/spotify/firestore"
+    "go.trueardian.com/spotify/firestore"
 )
 
 fs, _ := gcfs.NewClient(ctx, projectID)
@@ -466,9 +466,9 @@ go test ./... -cover
 ```
 
 ```
-ok   go.naturallyfunny.dev/spotify            coverage: 30.2% of statements
-ok   go.naturallyfunny.dev/spotify/firestore  coverage: 14.0% of statements
-ok   go.naturallyfunny.dev/spotify/postgres   coverage:  0.0% of statements
+ok   go.trueardian.com/spotify            coverage: 30.2% of statements
+ok   go.trueardian.com/spotify/firestore  coverage: 14.0% of statements
+ok   go.trueardian.com/spotify/postgres   coverage:  0.0% of statements
 ```
 
 The headline percentage is low **by design, and worth reading honestly**: this

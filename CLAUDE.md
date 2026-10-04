@@ -1,6 +1,6 @@
 # spotify
 
-Module Go `go.naturallyfunny.dev/spotify` — reusable public library untuk integrasi Spotify Web API.
+Module Go `go.trueardian.com/spotify` — reusable public library untuk integrasi Spotify Web API.
 Dirancang sebagai interface-based library agar dapat dipakai lintas project, tidak terikat ke satu database atau satu aplikasi.
 
 ## Konteks Pemakaian
@@ -53,7 +53,7 @@ Semua statement wajib pakai `IF NOT EXISTS` / `IF EXISTS`. Jangan pernah edit mi
 
 Migrasi penuh dari microservice ke reusable public library:
 
-- Rename module dari `spotify-api` → `go.avagenc.com/spotify` → `go.naturallyfunny.dev/spotify`
+- Rename module dari `spotify-api` → `go.avagenc.com/spotify` → `go.naturallyfunny.dev/spotify` → `go.trueardian.com/spotify`
 - Hapus seluruh layer HTTP: `main.go`, `handlers/`, Lambda artifacts, `api_documentation.md`
 - Skema disimpan di satu migrasi `000001_init` (tabel `spotify_tokens`) — `device_id` dan `gmail` tidak relevan dengan tanggung jawab modul ini. Sempat ada `000002_drop_device_id`/`000003_drop_gmail` lalu di-squash ke `000001`.
 - Buat `postgres/` package dengan `TokenStore` interface dan `Store` yang mengimplementasinya

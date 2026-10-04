@@ -1,4 +1,4 @@
-module go.naturallyfunny.dev/spotify
+module go.trueardian.com/spotify
 
 go 1.25.1
 
